@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Settings, Building2, FileText, Shield, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Settings, Building2, FileText, Shield, LogOut, ChevronLeft, ChevronRight, MessageCircle, Mail } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -20,6 +20,20 @@ export default function Sidebar({ user, collapsed, onToggle, onClose }) {
   const isAdmin = user?.role === 'admin';
 
   const filteredItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const supportItems = [
+    {
+      href: 'https://wa.me/5591983927903',
+      icon: MessageCircle,
+      label: 'WhatsApp',
+      value: '(91) 98392-7903'
+    },
+    {
+      href: 'mailto:kevinsoares@jcmempresas.com.br',
+      icon: Mail,
+      label: 'Email',
+      value: 'kevinsoares@jcmempresas.com.br'
+    }
+  ];
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -115,6 +129,51 @@ export default function Sidebar({ user, collapsed, onToggle, onClose }) {
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
+          {!collapsed && (
+            <div className="px-2 py-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold mb-2" style={{ color: '#555' }}>
+                Suporte
+              </p>
+              <div className="space-y-1">
+                {supportItems.map(item => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 px-1 py-1.5 text-[11px] font-semibold transition-colors"
+                    style={{ color: '#aaa' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#aaa'; }}
+                  >
+                    <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{item.value}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {collapsed &&
+            supportItems.map(item => (
+              <Tooltip key={item.label}>
+                <TooltipTrigger asChild>
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full flex items-center justify-center py-2 transition-colors"
+                    style={{ color: '#555' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#555'; }}
+                  >
+                    <item.icon className="w-4 h-4" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="font-bold uppercase tracking-wider text-xs">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            ))}
           {!collapsed && (
             <button
               onClick={() => logout()}

@@ -1,5 +1,5 @@
 # MACOM BI (Supabase)
-
+teste
 Este projeto foi desacoplado do Base44 e agora usa Supabase para autenticação e banco.
 
 ## Setup local

@@ -52,48 +52,76 @@ alter table public.reports enable row level security;
 alter table public.report_permissions enable row level security;
 
 drop policy if exists "profiles_select_authenticated" on public.profiles;
-create policy "profiles_select_authenticated"
+drop policy if exists "profiles_select_self_or_admin" on public.profiles;
+create policy "profiles_select_self_or_admin"
   on public.profiles for select
   to authenticated
-  using (true);
+  using (auth.uid() = id);
 
 drop policy if exists "profiles_update_self_or_admin" on public.profiles;
 create policy "profiles_update_self_or_admin"
   on public.profiles for update
   to authenticated
-  using (
-    auth.uid() = id or exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
 
 drop policy if exists "profiles_insert_self_or_admin" on public.profiles;
 create policy "profiles_insert_self_or_admin"
   on public.profiles for insert
   to authenticated
+  with check (auth.uid() = id and role = 'user');
+
+drop policy if exists "units_all_authenticated" on public.units;
+drop policy if exists "units_select_authenticated" on public.units;
+drop policy if exists "units_admin_manage" on public.units;
+create policy "units_select_authenticated"
+  on public.units
+  for select
+  to authenticated
+  using (true);
+
+create policy "units_admin_manage"
+  on public.units
+  for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role = 'admin'
+    )
+  )
   with check (
-    auth.uid() = id or exists (
+    exists (
       select 1 from public.profiles p
       where p.id = auth.uid() and p.role = 'admin'
     )
   );
 
-drop policy if exists "units_all_authenticated" on public.units;
-create policy "units_all_authenticated"
-  on public.units
-  for all
-  to authenticated
-  using (true)
-  with check (true);
-
 drop policy if exists "reports_all_authenticated" on public.reports;
-create policy "reports_all_authenticated"
+drop policy if exists "reports_select_authenticated" on public.reports;
+drop policy if exists "reports_admin_manage" on public.reports;
+create policy "reports_select_authenticated"
+  on public.reports
+  for select
+  to authenticated
+  using (true);
+
+create policy "reports_admin_manage"
   on public.reports
   for all
   to authenticated
-  using (true)
-  with check (true);
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role = 'admin'
+    )
+  );
 
 drop policy if exists "report_permissions_admin_manage" on public.report_permissions;
 create policy "report_permissions_admin_manage"

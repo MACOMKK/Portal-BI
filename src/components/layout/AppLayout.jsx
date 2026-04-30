@@ -6,7 +6,7 @@ import MobileHeader from './MobileHeader';
 
 export default function AppLayout() {
   const { user } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMd, setIsMd] = useState(() => window.innerWidth >= 768);
 

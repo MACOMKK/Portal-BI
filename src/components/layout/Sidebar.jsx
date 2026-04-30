@@ -131,22 +131,22 @@ export default function Sidebar({ user, collapsed, onToggle, onClose }) {
           </button>
           {!collapsed && (
             <div className="px-2 py-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold mb-2" style={{ color: '#555' }}>
+              <p className="text-[9px] uppercase tracking-widest font-bold mb-1.5" style={{ color: '#555' }}>
                 Suporte
               </p>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {supportItems.map(item => (
                   <a
                     key={item.label}
                     href={item.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2 px-1 py-1.5 text-[11px] font-semibold transition-colors"
+                    className="flex items-center gap-2 px-1 py-1 text-[10px] font-medium transition-colors"
                     style={{ color: '#aaa' }}
                     onMouseEnter={e => { e.currentTarget.style.color = '#fff'; }}
                     onMouseLeave={e => { e.currentTarget.style.color = '#aaa'; }}
                   >
-                    <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <item.icon className="w-3 h-3 flex-shrink-0" />
                     <span className="truncate">{item.value}</span>
                   </a>
                 ))}

@@ -1,15 +1,58 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useOutletContext, useParams, Link } from 'react-router-dom';
 import { dataClient } from '@/api/dataClient';
 import { ArrowLeft, Building2, Maximize2, Minimize2, Shield } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/use-toast';
 
 export default function ReportViewer() {
   const { user } = useOutletContext();
   const { id } = useParams();
   const [fullscreen, setFullscreen] = useState(false);
   const isAdmin = user?.role === 'admin';
+  const rotateToastRef = useRef(null);
+
+  useEffect(() => {
+    const isPortraitOrientation = () => {
+      if (window.matchMedia) {
+        return window.matchMedia('(orientation: portrait)').matches;
+      }
+      return window.innerHeight > window.innerWidth;
+    };
+
+    const checkOrientation = () => {
+      const isMobile = window.innerWidth < 768;
+      const isPortrait = isPortraitOrientation();
+      const shouldShowHint = isMobile && isPortrait;
+
+      if (shouldShowHint && !rotateToastRef.current) {
+        const toastInstance = toast({
+          title: 'Melhor visualização do gráfico',
+          description: 'Vire o celular para o modo horizontal.',
+        });
+        rotateToastRef.current = toastInstance;
+      }
+
+      if (!shouldShowHint && rotateToastRef.current) {
+        rotateToastRef.current.dismiss();
+        rotateToastRef.current = null;
+      }
+    };
+
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+      if (rotateToastRef.current) {
+        rotateToastRef.current.dismiss();
+        rotateToastRef.current = null;
+      }
+    };
+  }, []);
 
   const { data: report, isLoading } = useQuery({
     queryKey: ['report', id],

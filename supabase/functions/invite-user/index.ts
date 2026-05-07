@@ -64,6 +64,8 @@ Deno.serve(async (req) => {
     const email = String(body?.email || '').trim().toLowerCase();
     const roleRaw = String(body?.role || 'user').trim().toLowerCase();
     const redirectTo = String(body?.redirectTo || '').trim();
+    const initialPassword = String(body?.initialPassword || '');
+    const fullName = String(body?.fullName || '').trim();
 
     const allowedRoles = new Set(['admin', 'manager', 'user']);
     const role = allowedRoles.has(roleRaw) ? roleRaw : 'user';
@@ -71,9 +73,13 @@ Deno.serve(async (req) => {
     if (!email || !email.includes('@')) {
       return json({ error: 'Invalid email' }, 400);
     }
+    if (initialPassword && initialPassword.length < 8) {
+      return json({ error: 'Initial password must have at least 8 characters' }, 400);
+    }
 
     const inviteResult = await adminClient.auth.admin.inviteUserByEmail(email, {
-      redirectTo
+      redirectTo,
+      data: fullName ? { full_name: fullName, name: fullName } : undefined
     });
 
     const inviteError = inviteResult.error;
@@ -88,6 +94,7 @@ Deno.serve(async (req) => {
         {
           id: invitedUserId,
           email,
+          full_name: fullName || email.split('@')[0],
           role,
           updated_at: new Date().toISOString()
         },
@@ -96,6 +103,16 @@ Deno.serve(async (req) => {
 
       if (upsertError) {
         return json({ error: upsertError.message }, 400);
+      }
+
+      if (initialPassword) {
+        const { error: passwordError } = await adminClient.auth.admin.updateUserById(invitedUserId, {
+          password: initialPassword,
+          email_confirm: true
+        });
+        if (passwordError) {
+          return json({ error: passwordError.message }, 400);
+        }
       }
     } else {
       const { data: existingProfile, error: existingProfileError } = await adminClient
@@ -111,11 +128,25 @@ Deno.serve(async (req) => {
       if (existingProfile?.id) {
         const { error: updateRoleError } = await adminClient
           .from('profiles')
-          .update({ role, updated_at: new Date().toISOString() })
+          .update({
+            role,
+            ...(fullName ? { full_name: fullName } : {}),
+            updated_at: new Date().toISOString()
+          })
           .eq('id', existingProfile.id);
 
         if (updateRoleError) {
           return json({ error: updateRoleError.message }, 400);
+        }
+
+        if (initialPassword) {
+          const { error: passwordError } = await adminClient.auth.admin.updateUserById(existingProfile.id, {
+            password: initialPassword,
+            email_confirm: true
+          });
+          if (passwordError) {
+            return json({ error: passwordError.message }, 400);
+          }
         }
       }
     }

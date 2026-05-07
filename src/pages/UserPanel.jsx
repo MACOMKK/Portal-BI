@@ -2,10 +2,15 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dataClient } from '@/api/dataClient';
 import { BarChart3, Search, LogOut, Building2, ArrowRight } from 'lucide-react';
+import { supabase } from '@/api/supabaseClient';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 
 const MACOM_LOGO_URL = 'https://svlhklfzwtcvaospmhxy.supabase.co/storage/v1/object/public/Imagens%20macom/image_macom.png';
 
@@ -16,7 +21,12 @@ const categoryLabels = {
 
 export default function UserPanel() {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   const { data: allReports = [], isLoading: loadingReports } = useQuery({
     queryKey: ['reports-user-panel'],
@@ -39,9 +49,33 @@ export default function UserPanel() {
 
   const isLoading = loadingReports || loadingPerms;
 
+  const handleUpdateMyPassword = async () => {
+    if (newPassword.length < 8) {
+      toast({ title: 'Senha invalida', description: 'Use pelo menos 8 caracteres.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Senha invalida', description: 'As senhas nao conferem.' });
+      return;
+    }
+
+    setIsSavingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setIsSavingPassword(false);
+
+    if (error) {
+      toast({ title: 'Falha ao alterar senha', description: error.message });
+      return;
+    }
+
+    toast({ title: 'Senha alterada com sucesso!' });
+    setPasswordOpen(false);
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#f2f2f2' }}>
-      {/* Header */}
       <header style={{ background: '#141414', borderBottom: '3px solid #E30613' }}>
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -53,6 +87,14 @@ export default function UserPanel() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setPasswordOpen(true)}
+              className="hidden sm:inline text-[10px] font-black uppercase tracking-widest"
+              style={{ color: '#fff' }}
+            >
+              Alterar Minha Senha
+            </button>
+
             {user && (
               <div className="hidden sm:flex items-center gap-2.5">
                 <div className="w-7 h-7 flex items-center justify-center text-xs font-black text-white" style={{ background: '#E30613' }}>
@@ -75,22 +117,20 @@ export default function UserPanel() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6">
-        {/* Title + Search */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ color: '#E30613' }}>
-              Seus Relatórios
+              Seus Relatorios
             </p>
             <h1 className="text-2xl font-black uppercase tracking-tight" style={{ color: '#141414' }}>
-              Painel do Usuário
+              Painel do Usuario
             </h1>
           </div>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#999' }} />
             <Input
-              placeholder="Buscar relatório..."
+              placeholder="Buscar relatorio..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9 bg-white border-0 focus-visible:ring-1"
@@ -99,7 +139,6 @@ export default function UserPanel() {
           </div>
         </div>
 
-        {/* Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array(6).fill(0).map((_, i) => (
@@ -116,10 +155,10 @@ export default function UserPanel() {
               <BarChart3 className="w-8 h-8 text-white" />
             </div>
             <h3 className="text-lg font-black uppercase tracking-wider mb-1" style={{ color: '#141414' }}>
-              {search ? 'Nenhum resultado' : 'Sem relatórios disponíveis'}
+              {search ? 'Nenhum resultado' : 'Sem relatorios disponiveis'}
             </h3>
             <p className="text-sm" style={{ color: '#888' }}>
-              {search ? 'Tente outro termo.' : 'Você ainda não tem relatórios atribuídos. Contate o administrador.'}
+              {search ? 'Tente outro termo.' : 'Voce ainda nao tem relatorios atribuidos. Contate o administrador.'}
             </p>
           </div>
         ) : (
@@ -174,8 +213,46 @@ export default function UserPanel() {
       </main>
 
       <footer className="py-4 text-center text-[10px] uppercase tracking-widest font-bold" style={{ color: '#bbb' }}>
-        MACOM © {new Date().getFullYear()} — Portal BI
+        MACOM (c) {new Date().getFullYear()} - Portal BI
       </footer>
+
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-black uppercase tracking-wider text-sm">Alterar Minha Senha</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest">Nova senha</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Minimo 8 caracteres"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest">Confirmar senha</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setPasswordOpen(false)}
+                className="px-5 py-2.5 text-xs font-black uppercase tracking-widest border border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <Button onClick={handleUpdateMyPassword} disabled={isSavingPassword || !newPassword || !confirmPassword}>
+                {isSavingPassword ? 'Salvando...' : 'Salvar senha'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -158,12 +158,19 @@ export const dataClient = {
     }
   },
   users: {
-    inviteUser: async (email, role = 'user') => {
+    inviteUser: async (email, role = 'user', initialPassword = '', fullName = '') => {
       const redirectTo = `${window.location.origin}/set-password`;
       const { data, error } = await supabase.functions.invoke('invite-user', {
-        body: { email, role, redirectTo }
+        body: { email, role, redirectTo, initialPassword, fullName }
       });
       if (error) throw toError(error, 'Unable to send invite');
+      return data || { ok: true };
+    },
+    setUserPassword: async (userId, password) => {
+      const { data, error } = await supabase.functions.invoke('set-user-password', {
+        body: { userId, password }
+      });
+      if (error) throw toError(error, 'Unable to update user password');
       return data || { ok: true };
     }
   },

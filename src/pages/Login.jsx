@@ -27,6 +27,8 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0);
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -44,6 +46,51 @@ export default function Login() {
 
     navigate(getFromPath(location.search), { replace: true });
     window.location.reload();
+  };
+
+  const handleRecoverPassword = async () => {
+    const now = Date.now();
+    if (recoverCooldownUntil > now) {
+      const remainingSeconds = Math.ceil((recoverCooldownUntil - now) / 1000);
+      toast({
+        title: 'Aguarde para tentar novamente',
+        description: `Tente de novo em ${remainingSeconds}s.`
+      });
+      return;
+    }
+
+    if (!email) {
+      toast({ title: 'Informe seu email', description: 'Digite o email para recuperar a senha.' });
+      return;
+    }
+
+    setIsRecovering(true);
+    const redirectTo = `${window.location.origin}/set-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    setIsRecovering(false);
+
+    if (error) {
+      const message = (error.message || '').toLowerCase();
+      if (message.includes('rate limit')) {
+        const cooldownMs = 60 * 1000;
+        setRecoverCooldownUntil(Date.now() + cooldownMs);
+        toast({
+          title: 'Limite de envio atingido',
+          description: 'Aguarde 1 minuto e tente novamente.'
+        });
+        return;
+      }
+
+      toast({ title: 'Falha ao enviar recuperacao', description: error.message });
+      return;
+    }
+
+    setRecoverCooldownUntil(Date.now() + 60 * 1000);
+
+    toast({
+      title: 'Email de recuperacao enviado',
+      description: 'Verifique sua caixa de entrada para redefinir a senha.'
+    });
   };
 
   return (
@@ -113,6 +160,16 @@ export default function Login() {
             <Button type="submit" disabled={isSubmitting} className="w-full h-12 text-sm font-bold" style={{ background: '#f50914' }}>
               {isSubmitting ? 'Entrando...' : 'Entrar'}
             </Button>
+
+            <button
+              type="button"
+              onClick={handleRecoverPassword}
+              disabled={isRecovering || recoverCooldownUntil > Date.now()}
+              className="w-full text-xs font-bold uppercase tracking-widest"
+              style={{ color: '#141414' }}
+            >
+              {isRecovering ? 'Enviando recuperacao...' : 'Esqueci minha senha'}
+            </button>
           </form>
 
           <p className="text-xs mt-10 text-center" style={{ color: '#5d6670' }}>

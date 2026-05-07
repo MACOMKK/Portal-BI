@@ -5,6 +5,7 @@ create table if not exists public.profiles (
   email text unique not null,
   full_name text,
   role text not null default 'user',
+  active boolean not null default true,
   unit_id uuid,
   unit_name text,
   created_at timestamptz not null default now(),
@@ -51,25 +52,51 @@ alter table public.units enable row level security;
 alter table public.reports enable row level security;
 alter table public.report_permissions enable row level security;
 
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
 drop policy if exists "profiles_select_authenticated" on public.profiles;
 drop policy if exists "profiles_select_self_or_admin" on public.profiles;
 create policy "profiles_select_self_or_admin"
   on public.profiles for select
   to authenticated
-  using (auth.uid() = id);
+  using (
+    auth.uid() = id
+    or public.is_admin()
+  );
 
 drop policy if exists "profiles_update_self_or_admin" on public.profiles;
 create policy "profiles_update_self_or_admin"
   on public.profiles for update
   to authenticated
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
+  using (
+    auth.uid() = id
+    or public.is_admin()
+  )
+  with check (
+    auth.uid() = id
+    or public.is_admin()
+  );
 
 drop policy if exists "profiles_insert_self_or_admin" on public.profiles;
 create policy "profiles_insert_self_or_admin"
   on public.profiles for insert
   to authenticated
-  with check (auth.uid() = id and role = 'user');
+  with check (
+    (auth.uid() = id and role = 'user')
+    or public.is_admin()
+  );
 
 drop policy if exists "units_all_authenticated" on public.units;
 drop policy if exists "units_select_authenticated" on public.units;

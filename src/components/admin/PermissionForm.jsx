@@ -21,9 +21,11 @@ export default function PermissionForm({ onSaved, onCancel }) {
     queryFn: () => dataClient.entities.Report.list(),
   });
 
+  const activeUsers = users.filter(user => user.active !== false);
+
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const user = users.find(u => u.email === selectedUser);
+      const user = activeUsers.find(u => u.email === selectedUser);
       const perms = selectedReports.map(reportId => {
         const report = reports.find(r => r.id === reportId);
         return {
@@ -57,7 +59,7 @@ export default function PermissionForm({ onSaved, onCancel }) {
             <SelectValue placeholder="Selecione o usuário" />
           </SelectTrigger>
           <SelectContent>
-            {users.map(u => (
+            {activeUsers.map(u => (
               <SelectItem key={u.email} value={u.email}>
                 {u.full_name || u.email} {u.role === 'admin' ? '(Admin)' : ''}
               </SelectItem>

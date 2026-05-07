@@ -2,12 +2,29 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
 import { dataClient } from '@/api/dataClient';
-import { UserPlus, Pencil } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, UserX, UserCheck, MoreHorizontal, KeyRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import AdminGuard from '@/components/admin/AdminGuard';
 
@@ -30,6 +47,7 @@ export default function Settings() {
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('user');
   const [editUnitId, setEditUnitId] = useState('none');
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['settings-users'],
@@ -45,6 +63,7 @@ export default function Settings() {
     mutationFn: ({ id, data }) => dataClient.entities.User.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
       toast({ title: 'Usuario atualizado!' });
     },
   });
@@ -59,6 +78,31 @@ export default function Settings() {
     },
   });
 
+  const manageUserMutation = useMutation({
+    mutationFn: ({ userId, action }) => dataClient.users.manageUser(userId, action),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      const titles = {
+        delete: 'Usuario excluido com sucesso!',
+        deactivate: 'Usuario inativado com sucesso!',
+        activate: 'Usuario reativado com sucesso!',
+      };
+      toast({ title: titles[variables.action] || 'Usuario atualizado!' });
+      setConfirmAction(null);
+    },
+    onError: (error, variables) => {
+      const isDeleteBlocked = variables.action === 'delete' && error?.status === 409;
+      const description = isDeleteBlocked
+        ? 'Nao e possivel excluir este usuario porque ele possui relatorios vinculados.'
+        : error?.message || 'Nao foi possivel concluir a operacao.';
+      toast({
+        title: isDeleteBlocked ? 'Exclusao nao permitida' : 'Falha ao atualizar usuario',
+        description
+      });
+    }
+  });
+
   const handleInvite = async () => {
     if (!inviteName.trim()) {
       toast({ title: 'Nome obrigatorio', description: 'Informe o nome do usuario.' });
@@ -71,6 +115,8 @@ export default function Settings() {
     }
 
     await dataClient.users.inviteUser(inviteEmail, inviteRole, invitePassword, inviteName.trim());
+    queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+    queryClient.invalidateQueries({ queryKey: ['all-users'] });
     toast({ title: 'Convite enviado!', description: `Convite enviado para ${inviteEmail}` });
     setInviteOpen(false);
     setInviteEmail('');
@@ -124,6 +170,52 @@ export default function Settings() {
     setEditUser(null);
   };
 
+  const statusLabel = (targetUser) => targetUser?.active === false ? 'Inativo' : 'Ativo';
+
+  const openConfirmAction = (targetUser, action) => {
+    setConfirmAction({ user: targetUser, action });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction?.user?.id || !confirmAction?.action) return;
+    await manageUserMutation.mutateAsync({
+      userId: confirmAction.user.id,
+      action: confirmAction.action
+    });
+  };
+
+  const getActionCopy = () => {
+    const action = confirmAction?.action;
+    const targetUser = confirmAction?.user;
+    if (!action || !targetUser) return {};
+
+    if (action === 'delete') {
+      return {
+        title: 'Excluir usuario',
+        description: `Deseja excluir ${targetUser.full_name || targetUser.email}? A exclusao so sera concluida se ele nao tiver relatorios vinculados.`,
+        confirmLabel: 'Excluir'
+      };
+    }
+
+    if (action === 'deactivate') {
+      return {
+        title: 'Inativar usuario',
+        description: `Deseja inativar ${targetUser.full_name || targetUser.email}? O acesso ao sistema sera bloqueado, mas os vinculos com relatorios serao mantidos.`,
+        confirmLabel: 'Inativar'
+      };
+    }
+
+    return {
+      title: 'Reativar usuario',
+      description: `Deseja reativar ${targetUser.full_name || targetUser.email}? O acesso ao sistema sera liberado novamente.`,
+      confirmLabel: 'Reativar'
+    };
+  };
+
+  const actionCopy = getActionCopy();
+  const activeCount = users.filter(entry => entry.active !== false).length;
+  const inactiveCount = users.length - activeCount;
+
   return (
     <AdminGuard user={user}>
       <div className="min-h-screen" style={{ background: '#f2f2f2' }}>
@@ -134,15 +226,27 @@ export default function Settings() {
         </div>
 
         <div className="px-6 lg:px-10 py-6">
-          <div className="flex justify-end mb-4">
+          <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3 text-xs uppercase tracking-widest">
+              <span className="px-3 py-2 bg-white font-black" style={{ color: '#141414' }}>
+                {users.length} usuarios
+              </span>
+              <span className="px-3 py-2 bg-white" style={{ color: '#666' }}>
+                {activeCount} ativos
+              </span>
+              <span className="px-3 py-2 bg-white" style={{ color: '#666' }}>
+                {inactiveCount} inativos
+              </span>
+            </div>
+
             <button
               onClick={() => setInviteOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-all"
-              style={{ background: '#E30613' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#b80010'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#E30613'; }}
+              className="flex items-center gap-2 self-start px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white transition-all"
+              style={{ background: '#141414' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#222'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#141414'; }}
             >
-              <UserPlus className="w-4 h-4" /> Convidar Usuario
+              <UserPlus className="w-4 h-4" /> Novo Usuario
             </button>
           </div>
 
@@ -150,39 +254,92 @@ export default function Settings() {
             <Table>
               <TableHeader>
                 <TableRow style={{ background: '#fafafa' }}>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest">Nome</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest">Email</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest">Funcao</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest">Unidade</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest">Usuario</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest">Perfil</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-10 text-sm" style={{ color: '#999' }}>Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center py-10 text-sm" style={{ color: '#999' }}>Carregando...</TableCell></TableRow>
                 ) : users.map(u => (
                   <TableRow key={u.id} className="hover:bg-gray-50 transition-colors">
-                    <TableCell className="font-bold text-sm" style={{ color: '#141414' }}>{u.full_name || '-'}</TableCell>
-                    <TableCell className="text-xs" style={{ color: '#666' }}>{u.email}</TableCell>
-                    <TableCell className="text-xs">{u.role || 'user'}</TableCell>
-                    <TableCell className="text-xs">{u.unit_name || 'Nenhuma'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex gap-2">
-                        <button
-                          onClick={() => openEditDialog(u)}
-                          className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white"
-                          style={{ background: '#333' }}
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-9 w-9 items-center justify-center text-[11px] font-black uppercase"
+                          style={{ background: '#141414', color: '#fff' }}
                         >
-                          <span className="inline-flex items-center gap-1"><Pencil className="w-3 h-3" /> Editar</span>
-                        </button>
-                        <button
-                          onClick={() => openPasswordDialog(u)}
-                          className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white"
-                          style={{ background: '#141414' }}
-                        >
-                          Alterar Senha
-                        </button>
+                          {u.full_name?.[0] || u.email?.[0] || '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold truncate" style={{ color: '#141414' }}>{u.full_name || '-'}</p>
+                          <p className="text-xs truncate" style={{ color: '#666' }}>{u.email}</p>
+                        </div>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <div className="space-y-1">
+                        <p className="font-bold uppercase tracking-wide" style={{ color: '#141414' }}>{u.role || 'user'}</p>
+                        <p style={{ color: '#666' }}>{u.unit_name || 'Sem unidade'}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <span
+                        className="inline-flex items-center px-2 py-1 text-[10px] font-black uppercase tracking-widest"
+                        style={{
+                          background: u.active === false ? '#f4d7d9' : '#e8f3ea',
+                          color: u.active === false ? '#8a1c24' : '#1e5b2a',
+                        }}
+                      >
+                        {statusLabel(u)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="inline-flex h-9 w-9 items-center justify-center border transition-colors"
+                            style={{ borderColor: '#ddd', color: '#141414' }}
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => openEditDialog(u)} className="gap-2">
+                            <Pencil className="w-3.5 h-3.5" /> Editar usuario
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openPasswordDialog(u)} className="gap-2">
+                            <KeyRound className="w-3.5 h-3.5" /> Alterar senha
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {u.active === false ? (
+                            <DropdownMenuItem
+                              onClick={() => openConfirmAction(u, 'activate')}
+                              disabled={manageUserMutation.isPending}
+                              className="gap-2"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" /> Reativar
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => openConfirmAction(u, 'deactivate')}
+                              disabled={manageUserMutation.isPending}
+                              className="gap-2"
+                            >
+                              <UserX className="w-3.5 h-3.5" /> Inativar
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={() => openConfirmAction(u, 'delete')}
+                            disabled={manageUserMutation.isPending}
+                            className="gap-2 text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -321,6 +478,25 @@ export default function Settings() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black uppercase tracking-wider text-sm">
+              {actionCopy.title || 'Confirmar acao'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              {actionCopy.description || 'Confirme para continuar.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmAction} disabled={manageUserMutation.isPending}>
+              {manageUserMutation.isPending ? 'Processando...' : actionCopy.confirmLabel || 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminGuard>
   );
 }

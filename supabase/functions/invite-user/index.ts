@@ -96,6 +96,7 @@ Deno.serve(async (req) => {
           email,
           full_name: fullName || email.split('@')[0],
           role,
+          active: true,
           updated_at: new Date().toISOString()
         },
         { onConflict: 'id' }
@@ -130,6 +131,7 @@ Deno.serve(async (req) => {
           .from('profiles')
           .update({
             role,
+            active: true,
             ...(fullName ? { full_name: fullName } : {}),
             updated_at: new Date().toISOString()
           })

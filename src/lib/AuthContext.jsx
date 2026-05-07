@@ -43,8 +43,8 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       if (error.status === 401 || error.status === 403) {
         setAuthError({
-          type: 'auth_required',
-          message: 'Authentication required'
+          type: error.code === 'user_inactive' ? 'user_inactive' : 'auth_required',
+          message: error.message || 'Authentication required'
         });
       } else {
         setAuthError({

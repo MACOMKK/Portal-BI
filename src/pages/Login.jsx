@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
+import { dataClient } from '@/api/dataClient';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,15 @@ export default function Login() {
       toast({
         title: 'Falha no login',
         description: error.message
+      });
+      return;
+    }
+    try {
+      await dataClient.auth.me();
+    } catch (authCheckError) {
+      toast({
+        title: 'Acesso indisponivel',
+        description: authCheckError.message || 'Nao foi possivel concluir o login.'
       });
       return;
     }
